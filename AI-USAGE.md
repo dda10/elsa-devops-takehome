@@ -62,10 +62,17 @@ Each of these was caught by running the code, not by reading it.
 
 ## What was verified, and what wasn't
 
-Verified by running it here (macOS, arm64, Docker 8 GB): the cluster bootstrap, Part 3 `verify.sh` → `PASS` from a clean namespace,
-chart install and placement, the reclaim drill (0 failed requests), Part 6 end to end (HPA 3 → 6, thresholds, placement,
-dashboard), app tests, Semgrep (0 findings), Terraform fmt/init/validate, and a server-side dry run of every manifest.
+**Verified by running the reviewer's path** (fresh `git clone` of the public repo, `docker compose up -d`, then the numbered scripts; macOS arm64,
+OrbStack, 10 CPUs / 8 GB): cluster bootstrap and node prep; Argo CD syncing the chart from GitHub to the exact commit; the multi-arch image
+pulled anonymously from GHCR; `curl http://localhost:8080/api/quote` from the host; the reclaim drill (537 requests, 0 failed); Part 3
+`verify.sh` → `PASS`; Terraform fmt/init/validate; Part 6 end to end (HPA 3 → 6, thresholds met, placement respected, alert fired
+on saturation). The GitHub Actions workflow is green (tests, Semgrep gate, multi-arch build and push).
 
-Verified only after publishing: the Argo CD sync from GitHub and the GitHub Actions runs (see the README "Status" section).
-Not verifiable locally: the Karpenter manifests (no EKS) beyond schema reading. `terminationGracePeriod` on a NodePool
-was not in the docs the agent checked, so it is flagged in `karpenter/README.md`.
+**Not verified:**
+- The Karpenter manifests (no EKS cluster here): checked against the v1 docs and parsed as YAML only. `terminationGracePeriod` on a
+  NodePool was not in the docs the agent checked, so it is flagged in `karpenter/README.md`.
+- `terraform plan`/`apply` against a real Cloudflare zone (validate-only, as the assignment says).
+- Linux/amd64 runtime: everything above ran on arm64. CI builds amd64 too, but I did not run it.
+- Other people's networks: image pulls and the Terraform provider download were slow on this one (see the README troubleshooting notes).
+
+I can walk through any file in the live review. Anything I can't explain on the spot, I'd rather flag now than present as finished.

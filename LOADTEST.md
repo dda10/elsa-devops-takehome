@@ -2,7 +2,7 @@
 
 All numbers are from runs on the compose cluster: macOS arm64, OrbStack VM with 10 CPUs and 8 GB, 5 k3s nodes **sharing that VM**.
 Load was sent by k6 in the toolbox to `http://server/api/quote`, which goes **through Traefik** (the Ingress), not to the Service or pods.
-Raw output is in `loadtest/results/`.
+Raw output of the recorded run is in `loadtest/results/` (committed). A fresh `scripts/60-loadtest.sh` run writes to `loadtest/results-run/`, which is git-ignored, so it never overwrites that evidence.
 
 Each request does 100 ms of real CPU (measured by thread CPU time). Each pod has `cpu: 200m` request (the HPA's 100%) and `500m` limit.
 

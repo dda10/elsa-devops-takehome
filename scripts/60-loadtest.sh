@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 # 60 — Part 6: install kube-prometheus-stack, wire quote-api metrics/alert/dashboard,
 # then run k6 through the Ingress and record HPA scale-out + placement evidence.
-# Results land in loadtest/results/. Idempotent (helm upgrade --install, kubectl apply).
+# Results land in loadtest/results-run/ (git-ignored), so a rerun never overwrites the recorded
+# evidence committed in loadtest/results/. Idempotent (helm upgrade --install, kubectl apply).
 # Set SKIP_LOADTEST=1 to only install the monitoring pieces.
 set -euo pipefail
 . /scripts/lib/common.sh
 
 STACK_VERSION=92.10.1
 NS=quote-api
-OUT=/workspace/loadtest/results
+OUT=/workspace/loadtest/results-run
 mkdir -p "$OUT"
 
 log "installing kube-prometheus-stack $STACK_VERSION (OCI chart: no 6 MB repo index download)"

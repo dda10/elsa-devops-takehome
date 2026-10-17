@@ -8,3 +8,5 @@ __pycache__/
 .venv/
 # Local
 .DS_Store
+# Output of a fresh scripts/60-loadtest.sh run (recorded evidence lives in loadtest/results/)
+loadtest/results-run/

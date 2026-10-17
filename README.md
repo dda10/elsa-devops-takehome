@@ -213,4 +213,5 @@ keys); secrets come from Secrets Manager via ESO (`OPS-ANSWERS.md` Q4).
 
 ## Status
 
-See "What was verified, and what wasn't" in `AI-USAGE.md`.
+Every script was run end to end from a fresh clone of this public repo (details and limits in "What was verified, and what wasn't" in
+`AI-USAGE.md`). Not run: the Karpenter manifests (no EKS here) and a real Cloudflare `plan`/`apply`; both are validate-only by design.
