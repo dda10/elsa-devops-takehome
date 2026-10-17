@@ -1,0 +1,66 @@
+# kube-prometheus-stack 92.10.1, trimmed for a 5-node k3s cluster in Docker (~8 GB RAM).
+# Installed by scripts/60-loadtest.sh.
+
+# Pick up ServiceMonitors/PrometheusRules from any namespace, not only ones
+# labelled with this Helm release.
+prometheus:
+  prometheusSpec:
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    # 15s matches the HPA/metrics-server cadence, so scale events line up on the graphs.
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    retention: 2d
+    resources:
+      requests: {cpu: 200m, memory: 400Mi}
+      limits: {memory: 1Gi}
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts: [prometheus.localhost]
+    paths: [/]
+
+grafana:
+  adminPassword: ""          # random; anonymous read-only access is enough locally
+  defaultDashboardsEnabled: false
+  grafana.ini:
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+    auth:
+      disable_login_form: false
+  ingress:
+    enabled: true
+    ingressClassName: traefik
+    hosts: [grafana.localhost]
+    path: /
+  # The sidecar loads dashboards from ConfigMaps labelled grafana_dashboard=1.
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      searchNamespace: ALL
+
+# Alert rules are evaluated and visible in Prometheus; no Alertmanager routing locally.
+alertmanager:
+  enabled: false
+
+# k3s runs these inside the server process and doesn't expose them as scrape targets;
+# leaving them on just produces permanently-down targets and their alerts.
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeEtcd: {enabled: false}
+kubeProxy: {enabled: false}
+
+# Node-level metrics aren't needed for the service dashboard; container CPU comes from
+# the kubelet's cAdvisor endpoint and replica counts from kube-state-metrics.
+nodeExporter:
+  enabled: false
+prometheus-node-exporter:
+  enabled: false
+defaultRules:
+  rules:
+    node: false
+    nodeExporterAlerting: false
+    nodeExporterRecording: false

@@ -1,0 +1,4 @@
+# Copy to terraform.tfvars (git-ignored) and fill in. Do not commit real IDs for production.
+zone_id                = "0000000000000000000000000000000a"
+existing_dns_record_id = "00000000000000000000000000000000"
+origin_ip              = "192.0.2.10"

@@ -1,0 +1,6 @@
+scale run 14:37-14:45 ALERTS samples:
+[]
+max 5m p95 during scale run (what the rule evaluates):
+0.33000021637251115
+saturate run ALERTS:
+[{"state":"firing","first":"2026-10-17T14:59:30Z","last":"2026-10-17T15:01:00Z"},{"state":"pending","first":"2026-10-17T14:54:30Z","last":"2026-10-17T14:59:15Z"}]

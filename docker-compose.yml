@@ -1,0 +1,85 @@
+# Local 1 server + 4 agent k3s cluster plus a toolbox container.
+# `docker compose up -d` is the only step needed before ./scripts/run-all.sh.
+#
+# k3s is used directly instead of the k3d CLI so the whole cluster is plain
+# containers started by compose (the assignment's "agents are just containers").
+# k3s ships NetworkPolicy enforcement (kube-router) and Traefik by default.
+
+x-agent: &agent
+  image: rancher/k3s:v1.31.4-k3s1
+  entrypoint: ["/bin/sh", "-c"]
+  # Wait for the server to publish its join token into the shared volume, so no
+  # token is stored in this repository.
+  command:
+    - until [ -s /shared/node-token ]; do sleep 1; done; exec k3s agent --server https://server:6443 --token-file /shared/node-token --kubelet-arg=cgroups-per-qos=false --kubelet-arg=enforce-node-allocatable=
+  # cgroup v2 hosts: the kubelet cannot create /kubepods inside a private cgroup
+  # namespace, so run in the host cgroup namespace and skip the QoS cgroup tree.
+  cgroup: host
+  privileged: true
+  tmpfs:
+    - /run
+    - /var/run
+  volumes:
+    - shared:/shared:ro
+  depends_on:
+    - server
+
+services:
+  server:
+    image: rancher/k3s:v1.31.4-k3s1
+    hostname: server
+    entrypoint: ["/bin/sh", "-c"]
+    # Start the server, copy the node token into the shared volume, then stay in the foreground.
+    command:
+      - |
+        # k3s output goes to docker logs (and a file), so startup failures are visible.
+        k3s server --tls-san=server --kubelet-arg=cgroups-per-qos=false --kubelet-arg=enforce-node-allocatable= 2>&1 | tee /var/log/k3s.log &
+        until [ -s /var/lib/rancher/k3s/server/node-token ]; do sleep 1; done
+        cp /var/lib/rancher/k3s/server/node-token /shared/node-token
+        wait
+    cgroup: host
+    privileged: true
+    tmpfs:
+      - /run
+      - /var/run
+    ports:
+      # Ingress: host 8080 -> Traefik on the server node (svclb hostPort 80).
+      - "8080:80"
+    volumes:
+      - shared:/shared
+      - kubeconfig:/etc/rancher/k3s
+
+  agent-1:
+    <<: *agent
+    hostname: agent-1
+  agent-2:
+    <<: *agent
+    hostname: agent-2
+  agent-3:
+    <<: *agent
+    hostname: agent-3
+  agent-4:
+    <<: *agent
+    hostname: agent-4
+
+  toolbox:
+    build: ./toolbox
+    hostname: toolbox
+    depends_on:
+      - server
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./:/workspace
+      - kubeconfig:/kube:ro
+      # Terraform provider cache: the Cloudflare provider is a 43 MB download.
+      - tfcache:/root/.terraform.d/plugin-cache
+    environment:
+      TF_PLUGIN_CACHE_DIR: /root/.terraform.d/plugin-cache
+    working_dir: /workspace
+    # Keeps the container alive for `docker compose exec`.
+    command: ["sh", "/scripts/lib/toolbox-entrypoint.sh"]
+
+volumes:
+  shared:
+  kubeconfig:
+  tfcache:

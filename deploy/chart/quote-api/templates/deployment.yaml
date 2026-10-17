@@ -1,0 +1,50 @@
+# Autoscaled pool: prefers spot, may overflow to on-demand.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quote-api.name" . }}
+  labels:
+    {{- include "quote-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: spot-preferred
+spec:
+  # Start at minReplicas; after that the HPA owns the count (Argo CD ignores /spec/replicas).
+  replicas: {{ .Values.autoscaling.minReplicas }}
+  selector:
+    matchLabels:
+      {{- include "quote-api.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: spot-preferred
+  template:
+    metadata:
+      labels:
+        {{- include "quote-api.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: spot-preferred
+    spec:
+      {{- $affinity := printf `nodeAffinity:
+  # Hard: spot or on-demand only (keeps replicas off the GPU node).
+  requiredDuringSchedulingIgnoredDuringExecution:
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: %s
+            operator: In
+            values: [%s, %s]
+  # Soft: prefer spot for cost.
+  preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: %d
+      preference:
+        matchExpressions:
+          - key: %s
+            operator: In
+            values: [%s]` .Values.placement.capacityLabel .Values.placement.spotValue .Values.placement.onDemandValue (int .Values.placement.spotPreferenceWeight) .Values.placement.capacityLabel .Values.placement.spotValue }}
+      {{- include "quote-api.podSpec" (dict "root" . "affinity" $affinity) | nindent 6 }}
+      topologySpreadConstraints:
+        # Soft: spread across nodes, but never block rescheduling when a node disappears
+        # (a hard per-node rule would leave a pod Pending during the reclaim drill).
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              {{- include "quote-api.selectorLabels" . | nindent 14 }}
+          # Count only pods of the same revision, so a rollout spreads the new pods.
+          matchLabelKeys:
+            - pod-template-hash

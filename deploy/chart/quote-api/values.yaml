@@ -1,0 +1,51 @@
+image:
+  # Set by scripts/20-deploy.sh from the git origin (ghcr.io/<owner>/<repo>). Default is a placeholder.
+  repository: ghcr.io/OWNER/REPO
+  # Always set to a git SHA by scripts/20-deploy.sh (never "latest").
+  tag: ""
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+# Autoscaled, spot-preferred pool (Deployment "quote-api").
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 60
+
+pdb:
+  maxUnavailable: 1
+
+# Placement across the simulated nodepools created by troubleshoot/prepare.sh.
+#
+# Two Deployments behind one Service:
+#   quote-api            HPA 3..6, PREFERS spot (weight), may overflow to on-demand,
+#                        soft spread across nodes so a drained node never blocks rescheduling.
+#   quote-api-on-demand  fixed replicas, REQUIRED on on-demand: the availability anchor.
+#
+# Why not one Deployment with a hard capacity spread? Spread constraints are only checked
+# when a pod is scheduled. On HPA scale-down the ReplicaSet deletes pods by its own ranking
+# (newest first on ties), and we observed 6 -> 3 leave all three replicas on spot. A rolling
+# update has the same gap. The anchor makes "at least one on-demand replica" structural.
+#
+# The GPU node has no capacity label, so the required affinity keeps both pools off it.
+placement:
+  capacityLabel: acme.io/capacity
+  spotValue: spot
+  onDemandValue: on-demand
+  spotPreferenceWeight: 100
+  onDemandReplicas: 1
+
+service:
+  port: 80
+
+ingress:
+  className: traefik
+  # No host: the chart answers on any host, so localhost:8080 works from the laptop.
+  host: ""

@@ -1,0 +1,37 @@
+# Template rendered by scripts/20-deploy.sh (the __PLACEHOLDERS__ are replaced at deploy time).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: quote-api
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: __REPO_URL__
+    targetRevision: main
+    path: deploy/chart/quote-api
+    helm:
+      parameters:
+        - name: image.repository
+          value: __IMAGE_REPOSITORY__
+        - name: image.tag
+          value: __IMAGE_TAG__
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: quote-api
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Let the HPA own the replica count instead of selfHeal resetting it to minReplicas.
+      - RespectIgnoreDifferences=true
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      name: quote-api
+      jsonPointers:
+        - /spec/replicas

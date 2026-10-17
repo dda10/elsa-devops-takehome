@@ -1,0 +1,16 @@
+traefik CPU (cores):
+traefik-57b79cf995-blmmf 0.016375272844494224
+all containers CPU (cores):
+total 3.570949350684908
+per-node CPU (cores):
+server 0.026004786828893244
+agent-1 1.4995561895044776
+agent-2 1.5173179118795985
+agent-4 0
+agent-3 0.5280704624719386
+node allocatable CPU:
+agent-1   10
+agent-2   10
+agent-3   10
+agent-4   10
+server    10

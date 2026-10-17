@@ -1,0 +1,23 @@
+14:37:28 NAME                                   READY   STATUS    RESTARTS   AGE     IP           NODE      NOMINATED NODE   READINESS GATES
+14:37:28 quote-api-7f7b89d974-lrrs8             1/1     Running   0          7m3s    10.42.1.20   agent-2   <none>           <none>
+14:37:28 quote-api-7f7b89d974-nv2mm             1/1     Running   0          6m37s   10.42.1.22   agent-2   <none>           <none>
+14:37:28 quote-api-7f7b89d974-zc2gm             1/1     Running   0          7m3s    10.42.1.21   agent-2   <none>           <none>
+14:37:28 quote-api-on-demand-5f4d7c6755-fs4j5   1/1     Running   0          7m3s    10.42.4.18   agent-3   <none>           <none>
+14:38:20 quote-api-7f7b89d974-msvml             0/1     Pending   0          0s      <none>       <none>    <none>           <none>
+14:38:20 quote-api-7f7b89d974-qld4d             0/1     Pending   0          0s      <none>       <none>    <none>           <none>
+14:38:20 quote-api-7f7b89d974-msvml             0/1     Pending   0          0s      <none>       agent-1   <none>           <none>
+14:38:20 quote-api-7f7b89d974-qld4d             0/1     Pending   0          0s      <none>       agent-1   <none>           <none>
+14:38:20 quote-api-7f7b89d974-msvml             0/1     ContainerCreating   0          0s      <none>       agent-1   <none>           <none>
+14:38:20 quote-api-7f7b89d974-qld4d             0/1     ContainerCreating   0          0s      <none>       agent-1   <none>           <none>
+14:38:21 quote-api-7f7b89d974-qld4d             0/1     Running             0          1s      10.42.3.20   agent-1   <none>           <none>
+14:38:21 quote-api-7f7b89d974-msvml             0/1     Running             0          1s      10.42.3.19   agent-1   <none>           <none>
+14:38:22 quote-api-7f7b89d974-msvml             0/1     Running             0          2s      10.42.3.19   agent-1   <none>           <none>
+14:38:22 quote-api-7f7b89d974-qld4d             0/1     Running             0          2s      10.42.3.20   agent-1   <none>           <none>
+14:38:22 quote-api-7f7b89d974-qld4d             1/1     Running             0          2s      10.42.3.20   agent-1   <none>           <none>
+14:38:22 quote-api-7f7b89d974-msvml             1/1     Running             0          2s      10.42.3.19   agent-1   <none>           <none>
+14:38:35 quote-api-7f7b89d974-2h2xh             0/1     Pending             0          0s      <none>       <none>    <none>           <none>
+14:38:35 quote-api-7f7b89d974-2h2xh             0/1     Pending             0          0s      <none>       agent-1   <none>           <none>
+14:38:35 quote-api-7f7b89d974-2h2xh             0/1     ContainerCreating   0          0s      <none>       agent-1   <none>           <none>
+14:38:36 quote-api-7f7b89d974-2h2xh             0/1     Running             0          1s      10.42.3.21   agent-1   <none>           <none>
+14:38:37 quote-api-7f7b89d974-2h2xh             0/1     Running             0          2s      10.42.3.21   agent-1   <none>           <none>
+14:38:37 quote-api-7f7b89d974-2h2xh             1/1     Running             0          2s      10.42.3.21   agent-1   <none>           <none>

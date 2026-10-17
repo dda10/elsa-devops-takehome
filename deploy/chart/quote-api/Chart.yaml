@@ -1,0 +1,6 @@
+apiVersion: v2
+name: quote-api
+description: Quote API (Part 1 service) with spot/on-demand placement, HPA and PDB
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,27 @@
+# Per-request "Request Failed" timeout warnings were removed from this file (~450 KB); the k6 summary below is untouched.
+time="2026-10-17T14:56:00Z" level=warning msg="Insufficient VUs, reached 200 active VUs and cannot initialize more" executor=constant-arrival-rate scenario=saturate
+
+     ✗ status 200
+      ↳  58% — ✓ 7419 / ✗ 5258
+     ✗ has a quote
+      ↳  58% — ✓ 7419 / ✗ 5258
+
+     checks.........................: 58.52% 14838 out of 25354
+     data_received..................: 1.8 MB 4.1 kB/s
+     data_sent......................: 1.0 MB 2.4 kB/s
+     dropped_iterations.............: 2444   5.688017/s
+     http_req_blocked...............: avg=452.34µs med=9.29µs  p(90)=478.75µs p(95)=1ms      p(99)=5.61ms max=391.33ms
+     http_req_connecting............: avg=308.33µs med=0s      p(90)=363.57µs p(95)=720.44µs p(99)=3.72ms max=331.65ms
+     http_req_duration..............: avg=5.65s    med=6.12s   p(90)=10s      p(95)=10s      p(99)=10s    max=10.32s  
+       { expected_response:true }...: avg=4.31s    med=3.78s   p(90)=8.86s    p(95)=9.44s    p(99)=9.86s  max=9.99s   
+     http_req_failed................: 41.47% 5258 out of 12677
+     http_req_receiving.............: avg=147.73ms med=46.5µs  p(90)=470.27ms p(95)=940.43ms p(99)=2.28s  max=4.96s   
+     http_req_sending...............: avg=190.25µs med=20.79µs p(90)=76.35µs  p(95)=159.81µs p(99)=1.62ms max=387.3ms 
+     http_req_tls_handshaking.......: avg=0s       med=0s      p(90)=0s       p(95)=0s       p(99)=0s     max=0s      
+     http_req_waiting...............: avg=5.5s     med=5.69s   p(90)=10s      p(95)=10s      p(99)=10s    max=10.32s  
+     http_reqs......................: 12677  29.50368/s
+     iteration_duration.............: avg=5.65s    med=6.12s   p(90)=10s      p(95)=10s      p(99)=10.01s max=10.58s  
+     iterations.....................: 12677  29.50368/s
+     vus............................: 21     min=8              max=200
+     vus_max........................: 200    min=60             max=200
+

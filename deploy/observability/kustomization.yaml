@@ -1,0 +1,13 @@
+# Applied by scripts/60-loadtest.sh after kube-prometheus-stack (needs its CRDs).
+namespace: quote-api
+resources:
+  - servicemonitor.yaml
+  - prometheusrule.yaml
+configMapGenerator:
+  - name: quote-api-dashboard
+    files:
+      - grafana-dashboard.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

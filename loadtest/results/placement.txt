@@ -1,0 +1,8 @@
+POD                                NODE      CAPACITY
+quote-api-7f7b89d974-2h2xh         agent-1   spot
+quote-api-7f7b89d974-lrrs8         agent-2   spot
+quote-api-7f7b89d974-msvml         agent-1   spot
+quote-api-7f7b89d974-nv2mm         agent-2   spot
+quote-api-7f7b89d974-qld4d         agent-1   spot
+quote-api-7f7b89d974-zc2gm         agent-2   spot
+quote-api-on-demand-5f4d7c6755-fs4j5 agent-3   on-demand

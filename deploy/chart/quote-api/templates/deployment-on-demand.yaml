@@ -1,0 +1,29 @@
+# Availability anchor: always on the on-demand node, so a spot reclaim can never take
+# the whole service down, whatever the HPA or a rollout does to the spot-preferred pool.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "quote-api.name" . }}-on-demand
+  labels:
+    {{- include "quote-api.labels" . | nindent 4 }}
+    app.kubernetes.io/component: on-demand
+spec:
+  replicas: {{ .Values.placement.onDemandReplicas }}
+  selector:
+    matchLabels:
+      {{- include "quote-api.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: on-demand
+  template:
+    metadata:
+      labels:
+        {{- include "quote-api.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: on-demand
+    spec:
+      {{- $affinity := printf `nodeAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    nodeSelectorTerms:
+      - matchExpressions:
+          - key: %s
+            operator: In
+            values: [%s]` .Values.placement.capacityLabel .Values.placement.onDemandValue }}
+      {{- include "quote-api.podSpec" (dict "root" . "affinity" $affinity) | nindent 6 }}

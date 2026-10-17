@@ -1,0 +1,88 @@
+# Two NodePools share one EC2NodeClass. Karpenter tries the higher weight first:
+#   1. gpu-inference-spot (weight 100): cheap spot capacity, preferred.
+#   2. gpu-inference-on-demand (weight 10): fallback when spot is unavailable
+#      (insufficient capacity) or the spot pool is at its limit.
+# Both pools carry the same GPU taint, so only GPU workloads that tolerate it land here.
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu-inference-spot
+spec:
+  weight: 100
+  template:
+    metadata:
+      labels:
+        acme.io/node-type: gpu
+        acme.io/capacity: spot
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu-inference
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot"]
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: ["g5", "g6"]
+        - key: karpenter.k8s.aws/instance-gpu-count
+          operator: In
+          values: ["1"]
+      # Spot reclaims arrive as interruption notices (2 min); draining gets this
+      # long for in-flight inference requests before pods are force-deleted.
+      terminationGracePeriod: 10m
+  disruption:
+    # Never consolidate a node while it still runs inference: only truly empty
+    # GPU nodes are removed. WhenEmptyOrUnderutilized would repack live
+    # requests onto other nodes mid-stream.
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 30m
+    # Roll nodes weekly for AMI patches. Draining honours terminationGracePeriod.
+    expireAfter: 168h
+  limits:
+    cpu: "96"
+    nvidia.com/gpu: "8"
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: gpu-inference-on-demand
+spec:
+  weight: 10
+  template:
+    metadata:
+      labels:
+        acme.io/node-type: gpu
+        acme.io/capacity: on-demand
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: gpu-inference
+      taints:
+        - key: nvidia.com/gpu
+          value: "true"
+          effect: NoSchedule
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["on-demand"]
+        - key: karpenter.k8s.aws/instance-family
+          operator: In
+          values: ["g5", "g6"]
+        - key: karpenter.k8s.aws/instance-gpu-count
+          operator: In
+          values: ["1"]
+      terminationGracePeriod: 10m
+  disruption:
+    consolidationPolicy: WhenEmpty
+    consolidateAfter: 30m
+    expireAfter: 168h
+  limits:
+    cpu: "32"
+    nvidia.com/gpu: "2"

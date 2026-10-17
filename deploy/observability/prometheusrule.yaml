@@ -1,0 +1,32 @@
+# quote-api latency alert. Threshold justification (from the Part 6 runs, see LOADTEST.md):
+#   steady state up to 30 req/s ........ server-side p95 ~195-200ms
+#   HPA scale-up transient ............. p95 ~340ms for about 1 minute, then recovers
+#   saturation (35 req/s, CPU-limited) . p95 0.9-1.9s within 30s
+# 400ms is 2x the steady-state p95, above the scale-up blip; `for: 5m` lets the HPA react
+# before paging. Saturation exceeds it by 2-5x and does not recover on its own.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: quote-api
+  namespace: quote-api
+spec:
+  groups:
+    - name: quote-api.slo
+      rules:
+        - alert: QuoteApiHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(quote_api_http_request_duration_seconds_bucket{namespace="quote-api", path="/api/quote"}[5m]))
+            ) > 0.4
+            and
+            sum(rate(quote_api_http_requests_total{namespace="quote-api", path="/api/quote"}[5m])) > 1
+          for: 5m
+          labels:
+            severity: warning
+            service: quote-api
+          annotations:
+            summary: "quote-api p95 latency above 400ms for 5 minutes"
+            description: >-
+              p95 of /api/quote is {{ $value | humanizeDuration }} (steady state ~200ms).
+              Usually CPU saturation: check HPA (is it at maxReplicas?) and CPU throttling.
+            runbook: "Check `kubectl get hpa -n quote-api`; if at max, raise maxReplicas or add nodes."

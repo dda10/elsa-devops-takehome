@@ -1,0 +1,10 @@
+# Terraform local state and provider cache (the lock file IS committed)
+terraform/**/.terraform/
+terraform/**/*.tfstate*
+terraform/**/terraform.tfvars
+# Python
+__pycache__/
+.pytest_cache/
+.venv/
+# Local
+.DS_Store
