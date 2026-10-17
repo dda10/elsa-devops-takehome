@@ -1,78 +1,77 @@
 # AI usage disclosure
 
-## Tools and how they were used
+## What I used, and how much
 
-- **Claude Code (Anthropic), agentic mode in the Claude desktop app**: the main tool, and it did most of the work.
-  I gave it the assignment and the provided package. It wrote nearly every file in this repo, and it ran the commands
-  against the local cluster: building images, applying manifests, running the scripts, k6, and the Prometheus queries.
-  My role was directing it, setting scope, catching where it got stuck, and reviewing what it produced.
-- **Docs lookups done by the agent**: Context7 (Karpenter and Cloudflare Terraform provider docs), Docker Hub / PyPI /
-  Helm and OCI registries, to check that every pinned version and API field actually exists.
+I used **Claude Code** (Anthropic's agentic coding tool, in the Claude desktop app) as my main tool for this assignment, and it wrote
+most of the code and documentation in this repo: the service, Dockerfile, Helm chart, scripts, compose harness, Terraform,
+Karpenter manifests, CI workflow, k6 script, dashboard and the written answers. It also ran the commands against the local cluster
+(builds, `kubectl`/`helm`, the scripts, k6, Prometheus queries). I want to be upfront about that rather than
+describe it as just autocomplete.
 
-Because so much was generated, I treated **running it** as the review. Every claim in the docs is backed by output
-from a real run on the compose cluster. The few things that couldn't be run locally are listed at the end.
+Its documentation lookups (Karpenter and Cloudflare provider docs through Context7, and Docker Hub, PyPI and the Helm/OCI
+registries) were used to check that every pinned version and API field exists.
+
+## What I did
+
+- I set the scope: I read the assignment with it, chose to do **all** of Parts 4, 5 and 6 rather than one, and had it publish the repo.
+- I ran the project myself on my machine with the assignment's `docker compose up -d` and `./run-all.sh`, and when it hung at
+  "waiting for nodes" I sent the screenshot, which led to the cgroup v2 fix below.
+- I reviewed the results it reported, asked clarifying questions (for example whether the assignment needs a real cluster),
+  and told it about my unrelated EKS cluster so it stayed on the local k3s cluster only.
+- I decided what to publish and under which account.
 
 ## Prompts that moved the work forward
 
-1. *"read the file assignment … go through the folder"*. It produced a summary of all parts and a list of every
-   fault in `broken-app.yaml` before any code was written, which set the scope.
-2. *"why it stuck at this"* (with a screenshot of `run-all.sh` hanging at "waiting for nodes"). It led to the
-   diagnosis of the k3s/cgroup v2 crash described below.
-3. *"I want you to do this entirely"*. Asked for the whole assignment to be finished and verified on the live cluster,
-   not just written. Most of the corrections below came from that verification pass.
+1. *"read the file assignment"*, then *"go through the folder"*. This produced a summary of every part and a list of the faults in
+   `broken-app.yaml` before any code was written, and set the scope.
+2. *"why it stuck at this"* (with a screenshot of `run-all.sh` hanging). It led to the k3s / cgroup v2 diagnosis below.
+3. *"I want you to do this entirely"*. Asked for the whole assignment to be finished and **run** on a real cluster, not just written.
+   Most of the corrections below came out of that verification pass.
 
-## Where the AI was wrong, and how it was caught
+## Where the AI was wrong or suboptimal, and how it was caught
 
-Each of these was caught by running the code, not by reading it.
+Each of these was found by running the code, not by reading it.
 
-1. **The cluster never came up (cgroup v2).** The first compose file started k3s in a private cgroup namespace. On a
-   cgroup v2 host the kubelet failed with `cannot enter cgroupv2 "/sys/fs/cgroup/kubepods" … invalid state` and the
-   server exited with code 0. It had also sent k3s logs to a file inside the container, so `docker compose logs` showed
-   nothing and the script just hung. I noticed it was stuck; the agent then copied the log out of the dead container
-   and found the error. Fix: `cgroup: host`, kubelet `cgroups-per-qos=false`, and k3s output on stdout so failures are visible.
-2. **Simulated CPU work wasn't CPU work.** `burn_cpu()` looped until 100 ms of *wall-clock* time had passed. In the stress test,
-   pods were CPU-throttled 61% of the time but p95 stayed flat at ~150 ms. That's impossible if each request costs 100 ms of CPU:
-   throttled pods were just doing less work per request. Every latency and max-RPS number from that run was meaningless.
-   Fix: budget by `time.thread_time()`. Checked: 4 concurrent calls now take 400 ms (GIL), and Part 6 was re-run from scratch.
-3. **The on-demand guarantee broke on scale-down.** The first design used one Deployment with a hard topology spread on the
-   capacity label. It held at deploy time and through the drill, but after an HPA scale-down from 6 to 3, all three survivors were on
-   spot. Spread constraints are only checked at scheduling time; the ReplicaSet picks which pods to delete by its own ranking.
-   Fix: a separate 1-replica on-demand anchor Deployment plus the HPA-scaled spot-preferred pool. The guarantee is now
-   structural instead of statistical (see `values.yaml`).
-4. **Deployment started at 1 replica.** With the HPA enabled the chart omitted `replicas`, so each new rollout began at 1 pod
-   until the HPA caught up. Fix: render `replicas: minReplicas`, and have Argo CD ignore `/spec/replicas` so it doesn't fight the HPA.
-5. **Part 3 doc stated DNS would be blocked by default-deny.** On this cluster (k3s, kube-router) it wasn't. `nslookup` worked
-   under default-deny, and the smoke test passes without the DNS rule. Egress *is* enforced pod-to-pod (verified by adding rules
-   one at a time). The doc now says what was observed. The DNS rule is kept because Calico, Cilium and the EKS VPC CNI do block it.
-6. **The deploy script raced Argo CD.** `20-deploy.sh` waited for the Application to be `Healthy` and then rolled out the
-   Deployments. Every local test passed because I had been deploying with `helm install`, which bypasses Argo. Only the reviewer's
-   path (fresh clone, real sync from GitHub) exposed it: a brand-new Application reports `Healthy` before its first sync, so the wait
-   returned at once, and the following 300 s rollout timeout expired while the image was still pulling at ~2–4 min per node on this
-   network. Fix: wait for `Synced`, `Healthy` **and** `revision == HEAD`, with a 30-minute deadline and progress output.
-7. **Terraform looked fine on the host but hung in the toolbox.** The 43 MB Cloudflare provider downloads from GitHub's release CDN
-   (~58 KB/s here, ~12 min). Added a `tfcache` volume and a message so the first run doesn't look hung.
-8. **Leaked background sampler loops** from my own load tests kept writing into `loadtest/results/` after the runs ended
-   (found because the files had NUL bytes). I killed them by restarting the toolbox, deleted the corrupted file, and removed the
-   per-request warnings from one log. Results cited in `LOADTEST.md` come from the clean runs.
-9. **Smaller ones:** a nonsense k3s flag (`--disable=local-storage=false`); `run-all.sh` placed at the repo root although the Golden Rule
-   runs `./scripts/run-all.sh`; CI building amd64 only (Apple Silicon reviewers run arm64 nodes); the chart's image path
-   not matching what CI pushes; `helm repo add` taking 30–70 s to download repo indexes (switched to OCI charts); awk
-   column parsing that would break on `kubectl` output like `cpu: 3%/60%`; k6 thresholds first written as guesses, then replaced
-   with numbers from three measured baseline runs.
+1. **The cluster never came up (cgroup v2).** The first compose file ran k3s in a private cgroup namespace. On a cgroup v2 host the
+   kubelet failed with `cannot enter cgroupv2 "/sys/fs/cgroup/kubepods"` and the server exited with code 0. It had also sent k3s logs
+   to a file inside the container, so `docker compose logs` was empty and my run just hung. Fix: `cgroup: host`, kubelet
+   `cgroups-per-qos=false`, and k3s output on stdout so failures are visible.
+2. **The simulated CPU work wasn't CPU work.** `burn_cpu()` looped until 100 ms of *wall-clock* time had passed. In the stress test the
+   pods were CPU-throttled about 61% of the time but p95 stayed flat at ~150 ms, which is impossible if every request costs 100 ms of
+   CPU. Throttled pods were simply doing less work per request, so every latency and max-RPS number from that run was meaningless.
+   Fix: budget by `time.thread_time()`, then re-run Part 6 from scratch.
+3. **The on-demand guarantee broke on scale-down.** The first design used one Deployment with a hard topology spread on the capacity
+   label. It held at deploy time and through the drill, but after the HPA scaled from 6 back to 3, all three replicas were on spot.
+   Spread constraints are only checked when a pod is scheduled, and the ReplicaSet picks which pods to delete by its own ranking.
+   Fix: a separate 1-replica on-demand Deployment plus the HPA-scaled spot-preferred pool, so the guarantee is structural
+   (explained in `values.yaml`).
+4. **The deploy script raced Argo CD.** `20-deploy.sh` waited for the Application to be `Healthy`, then waited for the rollout.
+   My earlier tests passed because they used `helm install`, which bypasses Argo. Only a fresh-clone run exposed it: a brand-new
+   Application reports `Healthy` before its first sync, so the wait returned immediately and a 300 s rollout timeout expired while the
+   image was still pulling. Fix: wait for `Synced`, `Healthy` **and** `revision == HEAD`, with a 30-minute deadline and progress output.
+5. **The Part 3 write-up claimed DNS would be blocked by `default-deny`.** On this cluster (k3s / kube-router) it was not: `nslookup`
+   worked under default-deny and the smoke test passes without the DNS rule. Egress *is* enforced between pods (checked by adding rules
+   one at a time). The document now states what was observed, and the DNS rule stays because Calico, Cilium and the EKS VPC CNI do block it.
+
+Smaller ones: a meaningless k3s flag; `run-all.sh` first placed at the repo root although the assignment runs `./scripts/run-all.sh`;
+CI building amd64 only; the chart's image path not matching what CI pushes; slow `helm repo add` index downloads (switched to OCI
+charts); a Terraform provider download that looked like a hang (added a cache volume and a note); leaked background sampler loops that
+corrupted a results file (killed, file removed); and k6 thresholds first written as guesses, then replaced with numbers from three
+measured baseline runs.
 
 ## What was verified, and what wasn't
 
-**Verified by running the reviewer's path** (fresh `git clone` of the public repo, `docker compose up -d`, then the numbered scripts; macOS arm64,
-OrbStack, 10 CPUs / 8 GB): cluster bootstrap and node prep; Argo CD syncing the chart from GitHub to the exact commit; the multi-arch image
-pulled anonymously from GHCR; `curl http://localhost:8080/api/quote` from the host; the reclaim drill (537 requests, 0 failed); Part 3
-`verify.sh` → `PASS`; Terraform fmt/init/validate; Part 6 end to end (HPA 3 → 6, thresholds met, placement respected, alert fired
-on saturation). The GitHub Actions workflow is green (tests, Semgrep gate, multi-arch build and push).
+**Verified by running the reviewer's path** (fresh `git clone` of the public repo, `docker compose up -d`, then the numbered scripts;
+macOS arm64, OrbStack, 10 CPUs / 8 GB): cluster bootstrap and node prep; Argo CD syncing the chart from GitHub to the exact commit; the
+multi-arch image pulled anonymously from GHCR; `curl http://localhost:8080/api/quote` from the host; the reclaim drill (537 requests,
+0 failed); Part 3 `verify.sh` → `PASS`; Terraform fmt/init/validate; Part 6 end to end (HPA 3 → 6, thresholds met, placement respected,
+alert fired on saturation). The GitHub Actions workflow is green (tests, Semgrep gate, multi-arch build and push).
 
 **Not verified:**
 - The Karpenter manifests (no EKS cluster here): checked against the v1 docs and parsed as YAML only. `terminationGracePeriod` on a
-  NodePool was not in the docs the agent checked, so it is flagged in `karpenter/README.md`.
-- `terraform plan`/`apply` against a real Cloudflare zone (validate-only, as the assignment says).
-- Linux/amd64 runtime: everything above ran on arm64. CI builds amd64 too, but I did not run it.
-- Other people's networks: image pulls and the Terraform provider download were slow on this one (see the README troubleshooting notes).
+  NodePool was not in the docs that were checked, so it is flagged in `karpenter/README.md`.
+- `terraform plan` / `apply` against a real Cloudflare zone (validate-only, as the assignment says).
+- Linux/amd64 at runtime: everything ran on arm64. CI builds amd64 too, but I did not run it.
+- Other people's networks: image pulls and the Terraform provider download were slow on mine (see the README troubleshooting notes).
 
-I can walk through any file in the live review. Anything I can't explain on the spot, I'd rather flag now than present as finished.
+I'm happy to walk through any file in the live review, and I'll say so if there's a part I can't explain.
