@@ -31,11 +31,23 @@ log "applying the quote-api Application"
 sed -e "s#__REPO_URL__#$REPO_URL#" -e "s#__IMAGE_REPOSITORY__#$IMAGE_REPOSITORY#" -e "s#__IMAGE_TAG__#$IMAGE_TAG#" \
   /workspace/deploy/argocd/application.yaml | kubectl apply -f -
 
-log "waiting for Argo CD to sync and report Healthy"
-kubectl -n argocd wait application/quote-api \
-  --for=jsonpath='{.status.health.status}'=Healthy --timeout=600s
-kubectl -n "$NS" rollout status deployment/quote-api --timeout=300s
-kubectl -n "$NS" rollout status deployment/quote-api-on-demand --timeout=300s
+log "waiting for Argo CD to sync $IMAGE_TAG and report Healthy"
+# A fresh Application can briefly report Healthy before its first sync, so require the
+# synced revision to be HEAD as well. The first deploy also pulls the image onto several
+# nodes, which can take minutes on a slow link, hence the generous deadline.
+i=0
+while :; do
+  state=$(kubectl -n argocd get application quote-api \
+    -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision}' 2>/dev/null || true)
+  [ "$state" = "Synced Healthy $IMAGE_TAG" ] && break
+  i=$((i + 1))
+  [ "$i" -le 180 ] || die "Application not Synced+Healthy at $IMAGE_TAG after 30 minutes (state: $state); see: kubectl -n argocd describe application quote-api"
+  [ $((i % 6)) -eq 0 ] && echo "  ... $state"
+  sleep 10
+done
+echo "Application is Synced and Healthy"
+kubectl -n "$NS" rollout status deployment/quote-api --timeout=900s
+kubectl -n "$NS" rollout status deployment/quote-api-on-demand --timeout=900s
 
 log "placement (spot-preferred pool on spot, anchor on on-demand, nothing on GPU)"
 kubectl -n "$NS" get pods -o wide -L app.kubernetes.io/component

@@ -206,7 +206,8 @@ keys); secrets come from Secrets Manager via ESO (`OPS-ANSWERS.md` Q4).
    Raise the Docker VM memory, or run `SKIP_LOADTEST=1` if only the monitoring install is needed.
 4. **`quote-api` pods `ImagePullBackOff`.** The image for the checked-out commit isn't on GHCR yet (CI still running), or the
    checkout is not on a commit that was pushed to `main`. Wait for the `ci` workflow, or `git checkout main`, then rerun `scripts/20-deploy.sh`.
-5. **Slow first run.** Images are pulled into five nodes the first time (k3s, Argo CD, Prometheus, Grafana, nginx); later runs reuse them.
+5. **Slow first run.** Images are pulled onto the nodes the first time (k3s, Argo CD, Prometheus, Grafana, nginx, quote-api). On a slow
+   link the quote-api image alone took 2–4 minutes per node here. `20-deploy.sh` prints progress and waits up to 30 minutes; later runs reuse the pulled images.
 6. **`50-validate-tf.sh` is slow the first time.** `terraform init` downloads the 43 MB Cloudflare provider from GitHub's release CDN
    (on a slow link here, ~58 KB/s, that was ~12 minutes). It is cached in the `tfcache` volume, so later runs take seconds. It isn't hung.
 

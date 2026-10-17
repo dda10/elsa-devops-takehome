@@ -44,7 +44,17 @@ Each of these was caught by running the code, not by reading it.
 5. **Part 3 doc stated DNS would be blocked by default-deny.** On this cluster (k3s, kube-router) it wasn't. `nslookup` worked
    under default-deny, and the smoke test passes without the DNS rule. Egress *is* enforced pod-to-pod (verified by adding rules
    one at a time). The doc now says what was observed. The DNS rule is kept because Calico, Cilium and the EKS VPC CNI do block it.
-6. **Smaller ones:** a nonsense k3s flag (`--disable=local-storage=false`); `run-all.sh` placed at the repo root although the Golden Rule
+6. **The deploy script raced Argo CD.** `20-deploy.sh` waited for the Application to be `Healthy` and then rolled out the
+   Deployments. Every local test passed because I had been deploying with `helm install`, which bypasses Argo. Only the reviewer's
+   path (fresh clone, real sync from GitHub) exposed it: a brand-new Application reports `Healthy` before its first sync, so the wait
+   returned at once, and the following 300 s rollout timeout expired while the image was still pulling at ~2–4 min per node on this
+   network. Fix: wait for `Synced`, `Healthy` **and** `revision == HEAD`, with a 30-minute deadline and progress output.
+7. **Terraform looked fine on the host but hung in the toolbox.** The 43 MB Cloudflare provider downloads from GitHub's release CDN
+   (~58 KB/s here, ~12 min). Added a `tfcache` volume and a message so the first run doesn't look hung.
+8. **Leaked background sampler loops** from my own load tests kept writing into `loadtest/results/` after the runs ended
+   (found because the files had NUL bytes). I killed them by restarting the toolbox, deleted the corrupted file, and removed the
+   per-request warnings from one log. Results cited in `LOADTEST.md` come from the clean runs.
+9. **Smaller ones:** a nonsense k3s flag (`--disable=local-storage=false`); `run-all.sh` placed at the repo root although the Golden Rule
    runs `./scripts/run-all.sh`; CI building amd64 only (Apple Silicon reviewers run arm64 nodes); the chart's image path
    not matching what CI pushes; `helm repo add` taking 30–70 s to download repo indexes (switched to OCI charts); awk
    column parsing that would break on `kubectl` output like `cpu: 3%/60%`; k6 thresholds first written as guesses, then replaced
